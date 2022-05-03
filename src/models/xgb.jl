@@ -2,6 +2,7 @@ import CSV.read
 using DataFrames
 using MLJ
 using Chain
+using EvoTrees
 include("./metrics.jl")
 MLJ.default_resource(CPUThreads())
 ## Training and eval with CV
@@ -14,13 +15,21 @@ X = coerce(X, Count => Continuous)
 
 XGB = @load XGBoostClassifier pkg = "XGBoost"
 xgb = XGB()
+@load EvoTreeClassifier
+evo = EvoTreeClassifier(γ = 5, λ = 10, nrounds = 1000, max_depth = 1, rowsample = 1, colsample = 0)
 
 model = @chain xgb begin
   machine(X, y)
   fit!
 end
+
+model_evo = @chain evo begin
+  machine(X, y)
+  fit!
+end
 ##
-@time evaluate!(model, resampling = CV(shuffle = true, nfolds = 3), measure = [log_loss])
+@time evaluate!(model, resampling = CV(shuffle = true, nfolds = 3), measure = [log_loss, recall, precision], operation = [predict, predict_mode, predict_mode])
+@time evaluate!(model_evo, resampling = CV(shuffle = true, nfolds = 3), measure =log_loss)
 
 ## Eval with eval Set
 eval_set = read("./data/processed/eval_set.csv", DataFrame)
